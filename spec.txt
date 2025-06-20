@@ -1,0 +1,129 @@
+
+# Specification: Vessel Information and Shell Layout Program
+
+## 1. Overview
+This program consists of a LISP script (`slayout-R3.lsp`) and an associated DCL file (`slayout.dcl`) used within the AutoCAD environment.
+The primary purpose is to design the layout of pressure vessel shells and nozzles, and generate drawings within AutoCAD.
+Users input information such as project number, drawing number, shell dimensions, and nozzle positions via an interactive dialog box. Based on the parameters, shells and nozzles are automatically drawn.
+
+## 2. Functional Overview
+- **Dialog-based input**:
+  - Users enter detailed information about shells and nozzles through a dialog defined in the DCL file (`slayout.dcl`).
+  - Input items include project number, drawing number, revision number, shell diameter and thickness, nozzle size and position, etc.
+- **Database integration**:
+  - External diameters of nozzles are retrieved using the "lookupsize.lsp" file in "slayout-R3.lsp".
+  - "lookupsize.lsp" works fine as-is.
+  - Retrieves OD based on nozzle type (WN, LWN, HB), size (NPS), and class (150, 300, etc.).
+- **Drawing generation**:
+  - Draws shell contours, marking lines, quarter marks, and nozzle circles based on input parameters.
+  - Supports up to 3 shells, considering shell width and long seam position (NS or FS).
+- **Layer management**:
+  - Drawing elements are assigned to specific layers (e.g., "Punch", "0") for visual clarity.
+- **Error handling**:
+  - Performs basic validation of input values (e.g., positive shell count and dimensions).
+  - Displays alerts if files are missing or loading fails.
+
+## 3. File Structure
+- **slayout.dcl**:
+  - Defines the layout of the dialog.
+  - Includes "Input Shell" box for shell data and "Input Nozzles" box for nozzle data.
+  - Allows input of up to 20 nozzles (mark, size, class, type, distance, position, datum).
+- **lookupsize.lsp**:
+  - Nozzle OD data. Format: `type,NPS,class,OD` (e.g., "WN" "0.5" "" "0.84").
+  - Supported nozzle types: WN (Weld Neck), LWN (Long Weld Neck), HB (Heavy Barrel).
+  - Insert this code into "slayout-R3.lsp".
+- **slayout-R3.lsp**:
+  - Main LISP script.
+  - Handles dialog display, data retrieval, coordinate calculation, and drawing generation.
+
+## 4. Detailed Specification
+
+### 4.1 Dialog Input Items
+#### Input Shell
+| Key | Label | Type | Description |
+|-----|-------|------|-------------|
+| eb50 | Project Number | Edit box | Project number (numeric). |
+| eb51 | Drawing Number | Edit box | Drawing number (numeric). |
+| eb60 | Revision | Edit box | Revision number (numeric). |
+| pl1 | Are the head HE or SE? | Popup list | Head type (HE: Hemispherical, SE: Semi-elliptical). |
+| pl2 | Is it designed to ID or OD? | Popup list | Design basis (ID: Internal Diameter, OD: Outer Diameter). Default: ID. |
+| eb70 | Shell Diameter | Edit box | Shell diameter (numeric). |
+| eb75 | Plate Thickness | Edit box | Plate thickness (numeric). |
+| eb80 | Number of Shells Required | Edit box | Number of shells required (1–3). |
+| eb90 | Long Seam Offset | Edit box | Long seam offset (numeric). |
+| pl3 | Is the long seam on the first shell FS or NS? | Popup list | Long seam position (FS: Far Side, NS: Near Side). Default: FS. |
+| eb100 | Shell Cutting Length | Edit box | Shell cutting length (numeric). |
+| tg30 | All Shells Same Width | Toggle | Whether all shells have the same width. |
+| tg40 | Not All Shells Same Width | Toggle | If shell widths vary. |
+| eb120 | Shell Width | Edit box | Common shell width (numeric). |
+| eb130, eb150, eb170 | Shell # | Edit box | Unique shell number (1–3). |
+| eb140, eb160, eb180 | Shell Width | Edit box | Unique shell width (numeric). |
+
+#### Input Nozzles
+| Key | Label | Type | Description |
+|-----|-------|------|-------------|
+| eb1a–eb30a | Mark | Edit box | Nozzle mark (e.g., N1, N2). |
+| eb1b–eb30b | Size | Edit box | Nozzle size (NPS, e.g., 0.5). |
+| eb1c–eb30c | Rating | Popup list | Nozzle class (150, 300). |
+| eb1d–eb30d | Type | Popup list | Nozzle type (WN, LWN, HB). |
+| eb1e–eb30e | Distance | Edit box | Distance from datum (numeric). |
+| eb1f–eb30f | Location | Popup list | Nozzle location (Top, Bottom, NS, FS). Default: Top. |
+| eb1g–eb30g | Datum | Popup list | Datum point (Left, Right). Default: Left. |
+
+### 4.2 Data Processing
+- Reads nozzle data from slayout.dcl and stores external diameters in memory as list.
+  - Example format: `["WN", "0.5", "", "0.84"]` (type, NPS, class, OD).
+  - Retrieves OD based on nozzle mark (e.g., N1) for drawing.
+- **Coordinate calculation**:
+  - Shell start point fixed at `(100.0, 100.0, 0.0)`.
+  - Calculates shell contours and quarter mark coordinates based on long seam position (NS or FS).
+  - Nozzle center is determined from entered distance (`ebXe`) and position (`Top`, `Bottom`, `NS`, `FS`).
+  - Nozzle radius = OD from lookupsize.lsp + 0.25, divided by 2.
+
+### 4.3 Drawing Process
+- **Shells**:
+  - Supports up to 20 shells.
+  - Each shell drawn as rectangle using `pline` command.
+  - Positioned based on offset (`lsof`) and width (`swid`).
+- **Marking lines**:
+  - Draws 3.0 length marker lines at each shell corner.
+  - Quarter marks placed at one-quarter intervals along shell length.
+- **Nozzles**:
+  - Nozzles drawn as circles via `circle` command.
+  - Center based on entered distance and position.
+  - Radius = (OD + 0.25) / 2.
+- **Layers**:
+  - Shells and nozzles on layer "0".
+  - Markers drawn on layer "Punch" (blue).
+
+### 4.4 Error Handling
+- **Input validation**:
+  - Shell count (`nshlr`) must be 1–20.
+  - Shell diameter (`shld`), length (`slen`), and width (`swid`) must be positive.
+  - Alerts on invalid input and terminates program.
+
+## 5. Usage
+1. Enter `slayout` command in AutoCAD.
+2. Enter required data in the dialog.
+3. Press "Save" to save the input values to the same folder.
+4. Use "Load" to retrieve previous data (not implemented).
+5. "Draw" executes drawing, "Cancel" exits.
+
+## 6. Limitations
+- Maximum of 20 shells.
+- Maximum of 30 nozzles.
+
+## 7. Future Improvements
+- **Data saving/loading**:
+  - Implement "Save" and "Load" functionality to persist input data.
+- **User Interface enhancements**:
+  - Add preview to dialog.
+  - Real-time input validation.
+- **Performance optimization**:
+  - Simplify coordinate calculation logic.
+  - Efficiently process large nozzle datasets.
+
+## 8. Change History
+| Version | Date | Changes |
+|---------|------|---------|
+| R3 | TBD | Initial version. Supports drawing up to 3 shells and 2 nozzles (N1, N2). |
